@@ -26,6 +26,7 @@
 #include "ir/module-utils.h"
 #include "pass.h"
 #include "wasm.h"
+#include <iostream>
 
 namespace wasm {
 
@@ -35,6 +36,10 @@ struct RemoveImports : public WalkerPass<PostWalker<RemoveImports>> {
     if (!func->imported()) {
       return;
     }
+    if (!func->base.startsWith("risc0")) {
+      return;
+    }
+    std::cout << "in visitCall: " << func->name << std::endl; 
     Type type = func->getResults();
     if (type == Type::none) {
       replaceCurrent(getModule()->allocator.alloc<Nop>());
@@ -47,13 +52,18 @@ struct RemoveImports : public WalkerPass<PostWalker<RemoveImports>> {
   void visitModule(Module* curr) {
     std::vector<Name> names;
     ModuleUtils::iterImportedFunctions(
-      *curr, [&](Function* func) { names.push_back(func->name); });
+      *curr, [&](Function* func) { 
+           if (func->base.startsWith("risc0")) {
+            names.push_back(func->name); 
+           }
+        });
     // Do not remove names referenced in a table
     std::set<Name> indirectNames;
     ElementUtils::iterAllElementFunctionNames(
       curr, [&](Name& name) { indirectNames.insert(name); });
     for (auto& name : names) {
       if (indirectNames.find(name) == indirectNames.end()) {
+        std::cout << "removeFunction: " << name << std::endl; 
         curr->removeFunction(name);
       }
     }
